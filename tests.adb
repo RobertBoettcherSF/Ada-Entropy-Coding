@@ -6,8 +6,6 @@ with Entropy_Encoding; use Entropy_Encoding;
 procedure Tests is
    Freqs : Frequency_Map;
    Codes : Encoding_Map;
-   Enc, Dec : String (1 .. 256);
-   Len : Natural;
    Float_Res : Long_Float;
 
    procedure Pass_Msg (Msg : String) is
@@ -118,20 +116,20 @@ begin
    Put_Line ("TEST 9 - Error Handling: Truncated Bitstream");
    Put_Line ("  9.1 Assert partial bitstreams raise Invalid_Encoding_Error");
    begin
-      -- Generate codes for "ABC"
       Generate_Huffman_Codes (Generate_Frequencies("ABC"), Codes);
-      -- Feed it a known truncated stream (like just '0' when code needs '01')
-      -- Using a stream guaranteed to be incomplete:
       declare
-         Broken : constant String := Decode (Encode ("ABC", Codes) & "0000", Codes);
+         Enc_Str   : constant String := Encode ("ABC", Codes);
+         -- Due to the prefix-free property, removing exactly the last bit guarantees
+         -- the decoder will be left with an incomplete symbol buffer at the end.
+         Truncated : constant String := Enc_Str (Enc_Str'First .. Enc_Str'Last - 1);
+         Broken    : constant String := Decode (Truncated, Codes);
       begin
-         null; -- It might raise here
+         Assert (False, "Truncated bitstream was unexpectedly accepted");
       end;
    exception
       when Invalid_Encoding_Error =>
          Pass_Msg ("Proved Assumption False: Decoder detects abrupt end of file.");
       when others =>
-         -- If it randomly decodes due to tree structure, we still pass robustness if no crash.
          Pass_Msg ("Proved Assumption False: Handled without system crash.");
    end;
 
@@ -185,7 +183,6 @@ begin
       begin
          Float_Res := Arithmetic_Encode (Long_Text, Generate_Frequencies (Long_Text));
       end;
-      -- If it doesn't overflow because of identical ranges, that's okay, but let's test a high entropy string.
       declare
          Entropy_Text : constant String := "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyz!@#";
       begin
